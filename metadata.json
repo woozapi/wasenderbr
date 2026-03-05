@@ -1,6 +1,6 @@
 {
   "name": "Wasenderbr",
-  "description": "Ferramenta de captação de clientes no Google Maps e disparos de mensagens via WhatsApp com agentes de IA.",
+  "description": "Plataforma SaaS de automação de vendas: captação de leads no Google Maps, disparos via WhatsApp com Agentes IA, gestão de planos e multi-tenancy.",
   "requestFramePermissions": [
     "geolocation"
   ]

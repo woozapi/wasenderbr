@@ -15,7 +15,12 @@ import {
   MapPin,
   Bot,
   MessagesSquare,
-  Calendar
+  Calendar,
+  LogOut,
+  Building2,
+  Lock,
+  Mail,
+  User
 } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 import { motion, AnimatePresence } from 'motion/react';
@@ -120,8 +125,239 @@ const Card = ({ children, className }: { children: React.ReactNode, className?: 
 
 // --- Main App ---
 
+// --- Super Admin Component ---
+const SuperAdmin = ({ apiFetch }: { apiFetch: any }) => {
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [plans, setPlans] = useState<any[]>([]);
+  const [activeSubTab, setActiveSubTab] = useState<'accounts' | 'plans'>('accounts');
+  const [newPlan, setNewPlan] = useState({
+    name: '',
+    price: 0,
+    max_agents: 1,
+    max_campaigns: 1,
+    max_leads: 100,
+    features: ''
+  });
+
+  const fetchData = async () => {
+    const accs = await apiFetch('/api/admin/accounts');
+    const pls = await apiFetch('/api/admin/plans');
+    if (accs) setAccounts(accs);
+    if (pls) setPlans(pls);
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const createPlan = async () => {
+    if (!newPlan.name) return;
+    await apiFetch('/api/admin/plans', {
+      method: 'POST',
+      body: JSON.stringify({
+        ...newPlan,
+        features_json: newPlan.features.split(',').map(f => f.trim())
+      })
+    });
+    setNewPlan({ name: '', price: 0, max_agents: 1, max_campaigns: 1, max_leads: 100, features: '' });
+    fetchData();
+  };
+
+  const updateAccountPlan = async (accountId: number, planId: number) => {
+    await apiFetch(`/api/admin/accounts/${accountId}/plan`, {
+      method: 'PATCH',
+      body: JSON.stringify({ plan_id: planId })
+    });
+    fetchData();
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="space-y-6"
+    >
+      <header className="flex items-center justify-between">
+        <div>
+          <h2 className="text-3xl font-bold">Super Admin</h2>
+          <p className="text-slate-500">Gestão global de planos e inquilinos.</p>
+        </div>
+        <div className="flex bg-white p-1 rounded-xl border border-slate-200">
+          <button 
+            onClick={() => setActiveSubTab('accounts')}
+            className={cn(
+              "px-4 py-2 text-xs font-bold rounded-lg transition-all",
+              activeSubTab === 'accounts' ? "bg-emerald-50 text-emerald-700" : "text-slate-500 hover:bg-slate-50"
+            )}
+          >
+            Contas (Inquilinos)
+          </button>
+          <button 
+            onClick={() => setActiveSubTab('plans')}
+            className={cn(
+              "px-4 py-2 text-xs font-bold rounded-lg transition-all",
+              activeSubTab === 'plans' ? "bg-emerald-50 text-emerald-700" : "text-slate-500 hover:bg-slate-50"
+            )}
+          >
+            Planos
+          </button>
+        </div>
+      </header>
+
+      {activeSubTab === 'accounts' ? (
+        <Card>
+          <table className="w-full text-left">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-100 text-slate-400 text-xs font-semibold uppercase tracking-wider">
+                <th className="py-4 px-6">Empresa</th>
+                <th className="py-4 px-6">Plano Atual</th>
+                <th className="py-4 px-6">Usuários</th>
+                <th className="py-4 px-6">Criado em</th>
+                <th className="py-4 px-6">Ações</th>
+              </tr>
+            </thead>
+            <tbody className="text-sm">
+              {accounts.map((acc) => (
+                <tr key={acc.id} className="border-b border-slate-50 last:border-0">
+                  <td className="py-4 px-6 font-bold">{acc.name}</td>
+                  <td className="py-4 px-6">
+                    <span className="px-2 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-bold">
+                      {acc.plan_name || 'Sem Plano'}
+                    </span>
+                  </td>
+                  <td className="py-4 px-6 text-slate-500">{acc.user_count}</td>
+                  <td className="py-4 px-6 text-slate-400">{new Date(acc.created_at).toLocaleDateString()}</td>
+                  <td className="py-4 px-6">
+                    <select 
+                      className="text-xs bg-slate-50 border border-slate-200 rounded p-1"
+                      value={acc.plan_id || ''}
+                      onChange={(e) => updateAccountPlan(acc.id, Number(e.target.value))}
+                    >
+                      <option value="">Alterar Plano...</option>
+                      {plans.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <Card className="p-6 h-fit">
+            <h3 className="text-lg font-bold mb-4">Novo Plano</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Nome do Plano</label>
+                <input
+                  type="text"
+                  placeholder="Ex: Pro, Enterprise"
+                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none"
+                  value={newPlan.name}
+                  onChange={(e) => setNewPlan({ ...newPlan, name: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Preço (R$)</label>
+                <input
+                  type="number"
+                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none"
+                  value={newPlan.price}
+                  onChange={(e) => setNewPlan({ ...newPlan, price: Number(e.target.value) })}
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Agentes</label>
+                  <input
+                    type="number"
+                    className="w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none text-xs"
+                    value={newPlan.max_agents}
+                    onChange={(e) => setNewPlan({ ...newPlan, max_agents: Number(e.target.value) })}
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Campanhas</label>
+                  <input
+                    type="number"
+                    className="w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none text-xs"
+                    value={newPlan.max_campaigns}
+                    onChange={(e) => setNewPlan({ ...newPlan, max_campaigns: Number(e.target.value) })}
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Leads</label>
+                  <input
+                    type="number"
+                    className="w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none text-xs"
+                    value={newPlan.max_leads}
+                    onChange={(e) => setNewPlan({ ...newPlan, max_leads: Number(e.target.value) })}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Recursos (separados por vírgula)</label>
+                <textarea
+                  rows={3}
+                  placeholder="Suporte 24h, API, Handoff..."
+                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none resize-none"
+                  value={newPlan.features}
+                  onChange={(e) => setNewPlan({ ...newPlan, features: e.target.value })}
+                />
+              </div>
+              <button
+                onClick={createPlan}
+                className="w-full py-3 bg-emerald-500 text-white font-bold rounded-xl hover:bg-emerald-600 transition-all flex items-center justify-center gap-2"
+              >
+                <Plus size={20} />
+                Criar Plano
+              </button>
+            </div>
+          </Card>
+
+          <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+            {plans.map((plan) => (
+              <Card key={plan.id} className="p-6 border-t-4 border-t-emerald-500">
+                <div className="flex justify-between items-start mb-4">
+                  <h4 className="text-xl font-bold">{plan.name}</h4>
+                  <span className="text-2xl font-black text-emerald-600">R$ {plan.price}</span>
+                </div>
+                <div className="space-y-2 mb-6">
+                  <p className="text-xs text-slate-500 flex justify-between">
+                    <span>Agentes IA:</span> <span className="font-bold text-slate-700">{plan.max_agents}</span>
+                  </p>
+                  <p className="text-xs text-slate-500 flex justify-between">
+                    <span>Campanhas:</span> <span className="font-bold text-slate-700">{plan.max_campaigns}</span>
+                  </p>
+                  <p className="text-xs text-slate-500 flex justify-between">
+                    <span>Leads:</span> <span className="font-bold text-slate-700">{plan.max_leads}</span>
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {JSON.parse(plan.features_json || '[]').map((f: string, i: number) => (
+                    <span key={i} className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-[10px] font-medium">
+                      {f}
+                    </span>
+                  ))}
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+    </motion.div>
+  );
+};
+
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'search' | 'leads' | 'agents' | 'whatsapp' | 'campaigns' | 'settings' | 'kanban' | 'messages' | 'agenda'>('dashboard');
+  const [auth, setAuth] = useState<{ accountId: number, user: any } | null>(() => {
+    const saved = localStorage.getItem('wasender_auth');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [authForm, setAuthForm] = useState({ companyName: '', name: '', email: '', password: '' });
+
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'search' | 'leads' | 'agents' | 'whatsapp' | 'campaigns' | 'settings' | 'kanban' | 'messages' | 'agenda' | 'super_admin'>('dashboard');
   const [settingsSubTab, setSettingsSubTab] = useState<'credentials' | 'team'>('credentials');
   const [leads, setLeads] = useState<Lead[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -168,65 +404,110 @@ export default function App() {
 
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-  const fetchLeads = async () => {
-    const res = await fetch('/api/leads');
+  const apiFetch = async (url: string, options: any = {}) => {
+    if (!auth) return null;
+    const headers = {
+      ...options.headers,
+      'x-account-id': auth.accountId.toString(),
+      'Content-Type': 'application/json'
+    };
+    const res = await fetch(url, { ...options, headers });
+    if (res.status === 401) {
+      handleLogout();
+      return null;
+    }
+    return res.json();
+  };
+
+  const handleLogin = async () => {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: authForm.email, password: authForm.password })
+    });
     const data = await res.json();
-    setLeads(data);
+    if (data.success) {
+      const authData = { accountId: data.accountId, user: data.user };
+      setAuth(authData);
+      localStorage.setItem('wasender_auth', JSON.stringify(authData));
+    } else {
+      alert(data.error || 'Erro ao entrar');
+    }
+  };
+
+  const handleRegister = async () => {
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(authForm)
+    });
+    const data = await res.json();
+    if (data.success) {
+      setAuthMode('login');
+      alert('Conta criada com sucesso! Faça login.');
+    } else {
+      alert(data.error || 'Erro ao criar conta');
+    }
+  };
+
+  const handleLogout = () => {
+    setAuth(null);
+    localStorage.removeItem('wasender_auth');
+  };
+
+  const fetchLeads = async () => {
+    const data = await apiFetch('/api/leads');
+    if (data) setLeads(data);
   };
 
   const fetchAgents = async () => {
-    const res = await fetch('/api/agents');
-    const data = await res.json();
-    setAgents(data);
+    const data = await apiFetch('/api/agents');
+    if (data) setAgents(data);
   };
 
   const fetchCampaigns = async () => {
-    const res = await fetch('/api/campaigns');
-    const data = await res.json();
-    setCampaigns(data);
+    const data = await apiFetch('/api/campaigns');
+    if (data) setCampaigns(data);
   };
 
   const fetchTeam = async () => {
-    const res = await fetch('/api/team');
-    const data = await res.json();
-    setTeam(data);
+    const data = await apiFetch('/api/team');
+    if (data) setTeam(data);
   };
 
   const fetchCredentials = async () => {
-    const res = await fetch('/api/credentials');
-    const data = await res.json();
-    setCredentials(data);
+    const data = await apiFetch('/api/credentials');
+    if (data) setCredentials(data);
   };
 
   const fetchMessages = async () => {
-    const res = await fetch('/api/messages');
-    const data = await res.json();
-    setMessages(data);
+    const data = await apiFetch('/api/messages');
+    if (data) setMessages(data);
   };
 
   const fetchSchedules = async () => {
-    const res = await fetch('/api/schedules');
-    const data = await res.json();
-    setSchedules(data);
+    const data = await apiFetch('/api/schedules');
+    if (data) setSchedules(data);
   };
 
   const fetchWsStatus = async () => {
-    const res = await fetch('/api/whatsapp/status');
-    const data = await res.json();
-    setWsStatus(data);
+    const data = await apiFetch('/api/whatsapp/status');
+    if (data) setWsStatus(data);
   };
 
   useEffect(() => {
-    fetchLeads();
-    fetchAgents();
-    fetchCampaigns();
-    fetchTeam();
-    fetchCredentials();
-    fetchMessages();
-    fetchSchedules();
-    const interval = setInterval(fetchWsStatus, 3000);
-    return () => clearInterval(interval);
-  }, []);
+    if (auth) {
+      fetchLeads();
+      fetchAgents();
+      fetchCampaigns();
+      fetchTeam();
+      fetchCredentials();
+      fetchMessages();
+      fetchSchedules();
+      const interval = setInterval(fetchWsStatus, 3000);
+      return () => clearInterval(interval);
+    }
+  }, [auth]);
 
   const handleSearch = async () => {
     if (!searchQuery) return;
@@ -257,9 +538,8 @@ export default function App() {
   const saveLeads = async () => {
     setLoading(true);
     try {
-      await fetch('/api/leads', {
+      await apiFetch('/api/leads', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ leads: searchResults.map(r => ({ ...r, niche: searchQuery })) })
       });
       setSearchResults([]);
@@ -274,9 +554,8 @@ export default function App() {
 
   const createAgent = async () => {
     if (!newAgent.name || !newAgent.system_instruction) return;
-    await fetch('/api/agents', {
+    await apiFetch('/api/agents', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ...newAgent,
         faq_json: newAgent.faq.filter(f => f.q && f.a)
@@ -294,9 +573,8 @@ export default function App() {
 
   const createCampaign = async () => {
     if (!newCampaign.name || !newCampaign.agent_id) return;
-    await fetch('/api/campaigns', {
+    await apiFetch('/api/campaigns', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newCampaign)
     });
     setNewCampaign({
@@ -312,15 +590,14 @@ export default function App() {
   };
 
   const deleteCampaign = async (id: number) => {
-    await fetch(`/api/campaigns/${id}`, { method: 'DELETE' });
+    await apiFetch(`/api/campaigns/${id}`, { method: 'DELETE' });
     fetchCampaigns();
   };
 
   const createMember = async () => {
     if (!newMember.name) return;
-    await fetch('/api/team', {
+    await apiFetch('/api/team', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newMember)
     });
     setNewMember({ name: '', role: '', email: '' });
@@ -328,15 +605,14 @@ export default function App() {
   };
 
   const deleteMember = async (id: number) => {
-    await fetch(`/api/team/${id}`, { method: 'DELETE' });
+    await apiFetch(`/api/team/${id}`, { method: 'DELETE' });
     fetchTeam();
   };
 
   const createCredential = async () => {
     if (!newCred.name || !newCred.api_key) return;
-    await fetch('/api/credentials', {
+    await apiFetch('/api/credentials', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newCred)
     });
     setNewCred({ provider: 'openai', name: '', api_key: '', model_name: '' });
@@ -344,24 +620,22 @@ export default function App() {
   };
 
   const activateCredential = async (id: number, provider: string) => {
-    await fetch(`/api/credentials/${id}/activate`, {
+    await apiFetch(`/api/credentials/${id}/activate`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ provider })
     });
     fetchCredentials();
   };
 
   const deleteCredential = async (id: number) => {
-    await fetch(`/api/credentials/${id}`, { method: 'DELETE' });
+    await apiFetch(`/api/credentials/${id}`, { method: 'DELETE' });
     fetchCredentials();
   };
 
   const createSchedule = async () => {
     if (!newSchedule.name) return;
-    await fetch('/api/schedules', {
+    await apiFetch('/api/schedules', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newSchedule)
     });
     setNewSchedule({ name: '', agent_id: 0, member_id: 0, description: '' });
@@ -369,21 +643,20 @@ export default function App() {
   };
 
   const deleteSchedule = async (id: number) => {
-    await fetch(`/api/schedules/${id}`, { method: 'DELETE' });
+    await apiFetch(`/api/schedules/${id}`, { method: 'DELETE' });
     fetchSchedules();
   };
 
   const updateKanban = async (id: number, status: string) => {
-    await fetch(`/api/leads/${id}/kanban`, {
+    await apiFetch(`/api/leads/${id}/kanban`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ kanban_status: status })
     });
     fetchLeads();
   };
 
   const deleteAgent = async (id: number) => {
-    await fetch(`/api/agents/${id}`, { method: 'DELETE' });
+    await apiFetch(`/api/agents/${id}`, { method: 'DELETE' });
     fetchAgents();
   };
 
@@ -408,16 +681,14 @@ export default function App() {
           const cleanPhone = lead.phone.replace(/\D/g, '');
           const jid = `${cleanPhone}@s.whatsapp.net`;
 
-          await fetch('/api/whatsapp/send', {
+          await apiFetch('/api/whatsapp/send', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ jid, message })
           });
 
           // 3. Save message to DB
-          await fetch('/api/messages/save', {
+          await apiFetch('/api/messages/save', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ lead_id: lead.id, sender: 'ai', content: message })
           });
         } catch (e) {
@@ -429,6 +700,100 @@ export default function App() {
     fetchMessages();
     alert("Disparo concluído!");
   };
+
+  const logoutWhatsApp = async () => {
+    await apiFetch('/api/whatsapp/logout', { method: 'POST' });
+    fetchWsStatus();
+  };
+
+  if (!auth) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md p-8">
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 bg-emerald-500 text-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-200">
+              <Send size={32} />
+            </div>
+            <h1 className="text-2xl font-bold text-slate-900">Wasenderbr SaaS</h1>
+            <p className="text-slate-500">Acesse sua plataforma de automação</p>
+          </div>
+
+          <div className="space-y-4">
+            {authMode === 'register' && (
+              <div>
+                <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Nome da Empresa</label>
+                <div className="relative">
+                  <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                  <input
+                    type="text"
+                    placeholder="Sua Empresa Ltda"
+                    className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    value={authForm.companyName}
+                    onChange={e => setAuthForm({ ...authForm, companyName: e.target.value })}
+                  />
+                </div>
+              </div>
+            )}
+            <div>
+              <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Seu Nome</label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                <input
+                  type="text"
+                  placeholder="João Silva"
+                  className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                  value={authForm.name}
+                  onChange={e => setAuthForm({ ...authForm, name: e.target.value })}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">E-mail</label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                <input
+                  type="email"
+                  placeholder="seu@email.com"
+                  className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                  value={authForm.email}
+                  onChange={e => setAuthForm({ ...authForm, email: e.target.value })}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Senha</label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                <input
+                  type="password"
+                  placeholder="••••••••"
+                  className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                  value={authForm.password}
+                  onChange={e => setAuthForm({ ...authForm, password: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={authMode === 'login' ? handleLogin : handleRegister}
+              className="w-full py-4 bg-emerald-500 text-white font-bold rounded-xl hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-200"
+            >
+              {authMode === 'login' ? 'Entrar' : 'Criar Conta'}
+            </button>
+
+            <div className="text-center pt-4">
+              <button 
+                onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}
+                className="text-sm text-emerald-600 font-medium hover:underline"
+              >
+                {authMode === 'login' ? 'Não tem uma conta? Cadastre-se' : 'Já tem uma conta? Faça login'}
+              </button>
+            </div>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-slate-50 font-sans text-slate-900">
@@ -452,9 +817,12 @@ export default function App() {
           <SidebarItem icon={MessageSquare} label="Campanhas" active={activeTab === 'campaigns'} onClick={() => setActiveTab('campaigns')} />
           <SidebarItem icon={QrCode} label="Conexão WhatsApp" active={activeTab === 'whatsapp'} onClick={() => setActiveTab('whatsapp')} />
           <SidebarItem icon={Settings} label="Configurações" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
+          {auth.user.role === 'super_admin' && (
+            <SidebarItem icon={Lock} label="Super Admin" active={activeTab === 'super_admin'} onClick={() => setActiveTab('super_admin')} />
+          )}
         </nav>
 
-        <div className="mt-auto">
+        <div className="mt-auto pt-6 border-t border-slate-100 space-y-4">
           <div className={cn(
             "p-4 rounded-2xl flex items-center gap-3",
             wsStatus.status === 'open' ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
@@ -464,6 +832,23 @@ export default function App() {
               {wsStatus.status === 'open' ? 'WhatsApp Conectado' : 'WhatsApp Desconectado'}
             </span>
           </div>
+
+          <div className="flex items-center gap-3 px-4 py-3">
+            <div className="w-8 h-8 bg-emerald-100 text-emerald-600 rounded-lg flex items-center justify-center font-bold text-xs">
+              {auth.user.name.charAt(0)}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-slate-900 truncate">{auth.user.name}</p>
+              <p className="text-[10px] text-slate-500 truncate">{auth.user.email}</p>
+            </div>
+          </div>
+          <button 
+            onClick={handleLogout}
+            className="flex items-center gap-3 w-full px-4 py-3 text-slate-500 hover:bg-red-50 hover:text-red-600 rounded-xl transition-all"
+          >
+            <LogOut size={18} />
+            <span className="text-sm font-medium">Sair</span>
+          </button>
         </div>
       </aside>
 
@@ -1292,6 +1677,153 @@ export default function App() {
                 </div>
               )}
             </motion.div>
+          )}
+
+          {activeTab === 'campaigns' && (
+            <motion.div
+              key="campaigns"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-6"
+            >
+              <header>
+                <h2 className="text-3xl font-bold">Campanhas</h2>
+                <p className="text-slate-500">Configure automações de disparo e transição.</p>
+              </header>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <Card className="p-6 h-fit lg:col-span-1">
+                  <h3 className="text-lg font-bold mb-4">Nova Campanha</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Nome da Campanha</label>
+                      <input
+                        type="text"
+                        placeholder="Ex: Lançamento Verão"
+                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                        value={newCampaign.name}
+                        onChange={(e) => setNewCampaign({ ...newCampaign, name: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Agente IA Responsável</label>
+                      <select 
+                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none"
+                        value={newCampaign.agent_id}
+                        onChange={(e) => setNewCampaign({ ...newCampaign, agent_id: Number(e.target.value) })}
+                      >
+                        <option value={0}>Selecione um Agente</option>
+                        {agents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-slate-400 uppercase mb-1 block">Método Inicial</label>
+                      <select 
+                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none"
+                        value={newCampaign.initial_method}
+                        onChange={(e) => setNewCampaign({ ...newCampaign, initial_method: e.target.value as 'ai' | 'direct' })}
+                      >
+                        <option value="ai">IA (Assistente responde primeiro)</option>
+                        <option value="direct">Direto (Apenas disparo de mensagem)</option>
+                      </select>
+                    </div>
+
+                    <div className="pt-4 border-t border-slate-100">
+                      <h4 className="text-xs font-bold text-slate-400 uppercase mb-3">Regras de Transição</h4>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Após primeira resposta</label>
+                          <select 
+                            className="w-full px-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none"
+                            value={newCampaign.transition_rules.after_first_response}
+                            onChange={(e) => setNewCampaign({ 
+                              ...newCampaign, 
+                              transition_rules: { ...newCampaign.transition_rules, after_first_response: e.target.value } 
+                            })}
+                          >
+                            <option value="continue_ai">Continuar com IA</option>
+                            <option value="handoff">Handoff Humano Imediato</option>
+                            <option value="pause">Pausar Automação</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Em palavras-chave (Handoff)</label>
+                          <input
+                            type="text"
+                            placeholder="Ex: falar com humano, ajuda, suporte"
+                            className="w-full px-3 py-1.5 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none"
+                            value={newCampaign.transition_rules.on_keyword}
+                            onChange={(e) => setNewCampaign({ 
+                              ...newCampaign, 
+                              transition_rules: { ...newCampaign.transition_rules, on_keyword: e.target.value } 
+                            })}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={createCampaign}
+                      className="w-full py-3 bg-emerald-500 text-white font-bold rounded-xl hover:bg-emerald-600 transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-100"
+                    >
+                      <Plus size={20} />
+                      Criar Campanha
+                    </button>
+                  </div>
+                </Card>
+
+                <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {campaigns.map((campaign) => (
+                    <Card key={campaign.id} className="p-6 flex flex-col">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center">
+                          <MessageSquare size={24} />
+                        </div>
+                        <button 
+                          onClick={() => campaign.id && deleteCampaign(campaign.id)}
+                          className="text-slate-300 hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                      <h4 className="text-xl font-bold mb-1">{campaign.name}</h4>
+                      <div className="flex items-center gap-2 mb-4">
+                        <span className={cn(
+                          "text-[10px] font-bold px-2 py-0.5 rounded-full uppercase",
+                          campaign.initial_method === 'ai' ? "bg-emerald-100 text-emerald-700" : "bg-blue-100 text-blue-700"
+                        )}>
+                          {campaign.initial_method === 'ai' ? 'IA Ativa' : 'Disparo Direto'}
+                        </span>
+                      </div>
+                      
+                      <div className="space-y-3 mt-auto pt-4 border-t border-slate-50">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-slate-400">Agente:</span>
+                          <span className="font-bold text-slate-700">
+                            {agents.find(a => a.id === campaign.agent_id)?.name || 'Desconhecido'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-slate-400">Handoff:</span>
+                          <span className="font-bold text-slate-700">
+                            {campaign.transition_rules.on_keyword || 'Não configurado'}
+                          </span>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                  {campaigns.length === 0 && (
+                    <div className="col-span-full py-12 text-center text-slate-400">
+                      Nenhuma campanha configurada ainda.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'super_admin' && auth.user.role === 'super_admin' && (
+            <SuperAdmin apiFetch={apiFetch} />
           )}
 
           {activeTab === 'whatsapp' && (
