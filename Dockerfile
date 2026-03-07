@@ -1,0 +1,28 @@
+# Estágio 1: Build do Go Bridge
+FROM golang:1.21-alpine AS go-builder
+WORKDIR /app/go-bridge
+COPY go-bridge/ .
+RUN go mod download && go build -o bridge .
+
+# Estágio 2: Build do Node Server
+FROM node:20-alpine
+WORKDIR /app
+
+# Instalar dependências para compilar better-sqlite3 (se necessário)
+RUN apk add --no-cache python3 make g++
+
+COPY package*.json ./
+RUN npm install
+
+COPY . .
+# Copiar o bridge compilado
+COPY --from=go-builder /app/go-bridge/bridge ./go-bridge/bridge
+
+# Build do frontend
+RUN npm run build
+
+# Porta dinâmica do Railway
+EXPOSE 3000
+
+# Script para rodar ambos os processos
+CMD ./go-bridge/bridge & npm run dev
