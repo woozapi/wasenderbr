@@ -12,7 +12,8 @@ WORKDIR /app
 RUN apk add --no-cache python3 make g++
 
 COPY package*.json ./
-RUN npm install
+# Forçar modo silencioso e sem progresso para economizar memória e IO
+RUN npm install --progress=false --loglevel=error
 
 COPY . .
 # Copiar o bridge compilado

@@ -1,0 +1,16 @@
+node_modules/
+dist/
+dist_server/
+go-bridge/bridge
+go-bridge/bridge.exe
+go-bridge/bridge.db
+.git/
+*.log
+auth_info_baileys_*
+auth_sessions/
+*.db
+*.db-journal
+*.db.bak
+.env*
+build/
+coverage/
