@@ -1,5 +1,7 @@
 # Estágio 1: Build do Go Bridge
 FROM golang:1.24-alpine AS go-builder
+# Instalar git para baixar dependências que o exigem
+RUN apk add --no-cache git
 WORKDIR /app/go-bridge
 COPY go-bridge/ .
 RUN go mod download && go build -o bridge .
