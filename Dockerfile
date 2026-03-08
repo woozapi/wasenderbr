@@ -5,16 +5,21 @@ COPY go-bridge/ .
 RUN go mod download && go build -o bridge .
 
 # Estágio 2: Build do Node Server
-FROM node:20-alpine
+FROM node:20-slim
 WORKDIR /app
 
-# Instalar dependências para compilar better-sqlite3 (se necessário)
-RUN apk add --no-cache python3 make g++
+# Instalar dependências para compilar nativos no Debian Slim
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    make \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY package*.json ./
-# Definir limite de memória para o Node e usar npm ci para um build mais leve
-ENV NODE_OPTIONS="--max-old-space-size=448"
-RUN npm ci --no-audit --progress=false --loglevel=error
+# Definir limite de memória conservador e desativar concorrência do NPM
+ENV NODE_OPTIONS="--max-old-space-size=384"
+RUN npm config set maxsockets 1
+RUN npm install --no-audit --progress=false --loglevel=error
 
 COPY . .
 # Copiar o bridge compilado
