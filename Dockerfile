@@ -18,11 +18,11 @@ COPY . .
 # Copiar o bridge compilado
 COPY --from=go-builder /app/go-bridge/bridge ./go-bridge/bridge
 
-# Build do frontend
-RUN npm run build
+# Build do frontend e do servidor
+RUN npm run build && npm run build:server
 
 # Porta dinâmica do Railway
 EXPOSE 3000
 
-# Script para rodar ambos os processos
-CMD ./go-bridge/bridge & npm run dev
+# Rodar a bridge em background e o servidor em foreground
+CMD ./go-bridge/bridge & npm start

@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch --ignore \"auth_info_baileys_*\" server.ts",
+    "build:server": "tsc server.ts --esModuleInterop --outDir dist_server || true",
     "build": "vite build",
+    "start": "node dist_server/server.js",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit"
