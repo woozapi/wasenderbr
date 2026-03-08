@@ -12,8 +12,9 @@ WORKDIR /app
 RUN apk add --no-cache python3 make g++
 
 COPY package*.json ./
-# Forçar modo silencioso e sem progresso para economizar memória e IO
-RUN npm install --progress=false --loglevel=error
+# Definir limite de memória para o Node e usar npm ci para um build mais leve
+ENV NODE_OPTIONS="--max-old-space-size=448"
+RUN npm ci --no-audit --progress=false --loglevel=error
 
 COPY . .
 # Copiar o bridge compilado
