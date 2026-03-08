@@ -5,31 +5,34 @@ COPY go-bridge/ .
 RUN go mod download && go build -o bridge .
 
 # Estágio 2: Build do Node Server e Frontend
-# Usamos a imagem "full" que já contém g++, make e python para evitar apt-get (OOM)
-FROM node:20 AS node-builder
+FROM node:20-alpine AS node-builder
 WORKDIR /app
+
+# Instalar ferramentas de build (apk é mais leve que apt-get)
+RUN apk add --no-cache python3 make g++
+
 COPY package*.json ./
-# Limite de memória para o processo do NPM
-ENV NODE_OPTIONS="--max-old-space-size=512"
-RUN npm ci --no-audit --progress=false --loglevel=error
+# Limite de memória rigoroso para o processo do NPM/Node
+ENV NODE_OPTIONS="--max-old-space-size=350"
+RUN npm install --no-audit --progress=false --loglevel=error --no-fund
+
 COPY . .
+# Rodar build com limite de memória
 RUN npm run build && npm run build:server
 
-# Estágio 3: Runtime leve (Slim)
-FROM node:20-slim
+# Estágio 3: Runtime leve (Alpine)
+FROM node:20-alpine
 WORKDIR /app
 
-# Copiamos apenas o necessário do estágio de build do Node
+# Copiamos apenas os artefatos necessários
 COPY --from=node-builder /app/package*.json ./
 COPY --from=node-builder /app/node_modules ./node_modules
 COPY --from=node-builder /app/dist ./dist
 COPY --from=node-builder /app/dist_server ./dist_server
-
-# Copiamos o bridge compilado do estágio Go
 COPY --from=go-builder /app/go-bridge/bridge ./go-bridge/bridge
 
-# Porta dinâmica do Railway
+# Porta dinâmica
 EXPOSE 3000
 
-# Execução: Bridge em background e Node em foreground
+# Execução otimizada
 CMD ./go-bridge/bridge & node dist_server/server.js
