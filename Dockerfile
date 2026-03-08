@@ -1,5 +1,5 @@
 # Estágio 1: Build do Go Bridge
-FROM golang:1.21-alpine AS go-builder
+FROM golang:1.24-alpine AS go-builder
 WORKDIR /app/go-bridge
 COPY go-bridge/ .
 RUN go mod download && go build -o bridge .
